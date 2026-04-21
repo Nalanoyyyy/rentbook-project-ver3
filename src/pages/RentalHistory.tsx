@@ -1,77 +1,107 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
-// --- จำลองข้อมูลให้ดูสมจริงขึ้น ---
-const rentalData = [
-  { id: 118, title: "Demon Slayer", author: "Koyoharu Gotouge",category: "การ์ตูน, แอคชั่น, แฟนตาซี, ดราม่า, ,มังงะ", image: "https://picsum.photos/seed/c18/300/400", price: 60, rentDate: "10 มี.ค. 2026",returnDate: "17 มี.ค. 2026", status: "คืนแล้ว" },
-  { id: 113, title: "Death Note", author: "Tsugumi Ohba",category: "การ์ตูน, แฟนตาซี, มังงะ", image: "https://picsum.photos/seed/c13/300/400", price: 45, rentDate: "10 เม.ย. 2026",returnDate: "17 เม.ย. 2026", status: "กำลังเช่า" },
-];
+const ss     = sessionStorage;
+const sGet   = (k: string) => ss.getItem(k) || '';
+const isAuth = () => sGet('isLoggedIn') === 'true' || sGet('isAuthenticated') === 'true';
+const parse  = (k: string): any[] => { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch { return []; } };
 
-const RentalHistory: React.FC = () => {
+const getAllOrders = (): any[] => {
+  const seen = new Set();
+  return [...parse('admin_orders'), ...parse('allOrders')]
+    .filter(o => { const id = o.id || o.orderId; return id && !seen.has(id) && seen.add(id); });
+};
+
+const STATUS_CLS: Record<string, string> = {
+  'รอดำเนินการ':    'bg-yellow-100 text-yellow-700',
+  'ยืนยันแล้ว':     'bg-blue-100 text-blue-700',
+  'กำลังจัดส่ง':    'bg-blue-100 text-blue-700',
+  'คืนหนังสือแล้ว': 'bg-green-100 text-green-700',
+  'สำเร็จ':         'bg-green-100 text-green-700',
+  'ยกเลิก':         'bg-red-100 text-red-600',
+};
+
+const RentalHistoryPage: React.FC = () => {
+  const navigate = useNavigate();
+  const [orders, setOrders] = useState<any[]>([]);
+
+  const load = useCallback(() => {
+    const email = sGet('userEmail');
+    const name  = sGet('userName');
+    setOrders(getAllOrders().filter(o =>
+      (email && email !== '-' && o.email === email) || (name && o.customerName === name)
+    ));
+  }, []);
+
+  useEffect(() => {
+    if (!isAuth()) { navigate('/login'); return; }
+    load();
+    window.addEventListener('storage', load);
+    return () => window.removeEventListener('storage', load);
+  }, [navigate, load]);
+
   return (
-    <div className="max-w-4xl mx-auto mt-12 mb-10 px-4">
-      {/* ส่วนหัวส่วนประวัติ */}
-     <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-bold flex items-center gap-2">
-        <span className="material-symbols-outlined text-primary">history</span>
-        ประวัติการเช่า
-      </h3>
-      {/* ... */}
-    </div>
+    <main className="max-w-4xl mx-auto px-4 py-12 min-h-[85vh]">
+      <div className="flex items-center gap-3 mb-8">
+        <span className="material-symbols-outlined text-4xl text-primary">history</span>
+        <h1 className="text-3xl font-black">ประวัติการเช่าของคุณ</h1>
+      </div>
 
-      {/* รายการประวัติแบบกระชับ (Compact List) */}
-      <div className="grid grid-cols-1 gap-3">
-        {rentalData.map((item) => (
-          <div 
-            key={item.id} 
-            className="group flex items-center gap-4 bg-white dark:bg-[#121212] p-3 rounded-2xl border border-gray-100 dark:border-white/5 hover:border-primary/30 transition-all shadow-sm hover:shadow-md"
-          >
-            {/* รูปหน้าปก (ขนาดเล็กแต่ชัดเจน) */}
-            <div className="w-14 h-20 flex-shrink-0 rounded-lg overflow-hidden shadow-sm bg-gray-200">
-              <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-            </div>
-
-            {/* ข้อมูลหนังสือ */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className="text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase tracking-tighter">
-                  {item.category.split(',')[0]}
+      <div className="space-y-6">
+        {orders.length === 0 ? (
+          <div className="bg-white dark:bg-white/5 p-12 rounded-[2rem] border border-[#e7f3ec] dark:border-[#1a3324] text-center shadow-sm">
+            <span className="material-symbols-outlined text-6xl text-gray-300 mb-4 block">auto_stories</span>
+            <p className="text-gray-500 font-bold text-lg mb-4">คุณยังไม่มีประวัติการเช่าหนังสือ</p>
+            <Link to="/" className="inline-block px-6 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">
+              ไปเลือกหนังสือกันเลย
+            </Link>
+          </div>
+        ) : orders.map(o => (
+          <div key={o.id || o.orderId} className="bg-white dark:bg-[#1a3324] rounded-[2rem] border border-[#e7f3ec] dark:border-[#1a3324] shadow-sm overflow-hidden">
+            <div className="bg-gray-50 dark:bg-white/5 p-4 border-b border-gray-100 dark:border-white/5 flex flex-wrap justify-between items-center gap-4">
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">รหัสคำสั่งเช่า</p>
+                <p className="font-black text-primary">{o.id || o.orderId}</p>
+              </div>
+              <div className="flex gap-6 items-center">
+                <div className="text-right">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">วันที่ทำรายการ</p>
+                  <p className="font-bold text-sm">{o.date || o.orderDate}</p>
+                </div>
+                <span className={`px-4 py-1.5 rounded-full text-xs font-bold ${STATUS_CLS[o.status] || 'bg-yellow-100 text-yellow-700'}`}>
+                  {o.status || 'รอดำเนินการ'}
                 </span>
               </div>
-              <h4 className="text-sm font-bold text-gray-800 dark:text-gray-100 truncate">
-                {item.title}
-              </h4>
-              
-              {/* วันที่ (ใช้ไอคอนขนาดเล็ก) */}
-              <div className="flex items-center gap-4 mt-1">
-                <div className="flex items-center gap-1 text-[10px] text-gray-500">
-                  <span className="material-symbols-outlined text-[14px] opacity-70">calendar_today</span>
-                  <span>{item.rentDate}</span>
+            </div>
+            <div className="p-6 space-y-4">
+              {(o.items || []).map((item: any, i: number) => (
+                <div key={i} className="flex gap-4 items-center bg-gray-50 dark:bg-black/20 p-3 rounded-2xl">
+                  {item.image
+                    ? <img src={item.image} alt={item.title} className="w-12 h-16 object-cover rounded-lg shadow-sm" />
+                    : <div className="w-12 h-16 bg-gray-200 dark:bg-white/10 rounded-lg flex items-center justify-center"><span className="material-symbols-outlined text-gray-400">book</span></div>}
+                  <div className="flex-1">
+                    <p className="font-bold text-sm md:text-base">{item.title}</p>
+                    <p className="text-xs text-gray-500 mt-1">ระยะเวลาเช่า: <span className="font-bold text-gray-700 dark:text-gray-300">{item.days ? item.days / 7 : (item.rentweeks || 1)} สัปดาห์</span></p>
+                  </div>
+                  <p className="font-black text-primary pr-2">฿{Number(item.price || 0).toLocaleString()}</p>
                 </div>
-                <div className="flex items-center gap-1 text-[10px] text-gray-500">
-                  <span className="material-symbols-outlined text-[14px] opacity-70">event_repeat</span>
-                  <span>{item.returnDate}</span>
+              ))}
+              <div className="pt-4 border-t border-dashed border-gray-200 dark:border-white/10 flex justify-between items-center">
+                <div>
+                  <p className="text-xs text-red-500 font-bold mb-1">กำหนดคืนหนังสือภายใน:</p>
+                  <p className="font-bold text-sm">{o.returnDate || '-'}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">ยอดชำระสุทธิ</p>
+                  <p className="font-black text-xl text-primary">฿{Number(o.total || 0).toLocaleString()}</p>
                 </div>
               </div>
-            </div>
-
-            {/* สถานะและราคา (จัดวางให้สมดุล) */}
-            <div className="flex flex-col items-end gap-1.5 min-w-[70px]">
-              <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
-                item.status === 'กำลังเช่า' 
-                ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/10' 
-                : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10'
-              }`}>
-                {item.status}
-              </span>
-              <p className="text-base font-black text-primary tracking-tight">
-                ฿{item.price}
-              </p>
             </div>
           </div>
         ))}
       </div>
-    </div>
+    </main>
   );
 };
 
-export default RentalHistory;
+export default RentalHistoryPage;
