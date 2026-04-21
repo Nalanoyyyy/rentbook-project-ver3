@@ -30,7 +30,7 @@ const Navbar: React.FC = () => {
   const [loggedIn,    setLoggedIn]    = useState(isAuth());
   const [admin,       setAdmin]       = useState(isAdmin());
   const [nick,        setNick]        = useState(getNick());
-  const [allBooks, setAllBooks] = useState<any[]>([]); // ❌ อยู่นอก component
+  const [allBooks, setAllBooks] = useState<any[]>([]); 
   const [coupons,     setCoupons]     = useState(getCouponCount());
 
   const sync = useCallback(() => {
