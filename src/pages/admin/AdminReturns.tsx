@@ -2,15 +2,7 @@ import { apiGetOrders, apiUpdateOrderStatus } from '../../services/api';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isAdmin, isAuthenticated } from '../../services/authService';
-import { getInventory, saveInventory } from '../../services/inventoryService';
 import AdminNav from './AdminNav';
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-const parseOrders = (key: string): any[] => {
-  try { return JSON.parse(localStorage.getItem(key) || '[]'); }
-  catch { return []; }
-};
 
 const isOverdue = (returnDate: string): boolean => {
   if (!returnDate) return false;
@@ -19,8 +11,6 @@ const isOverdue = (returnDate: string): boolean => {
   return !isNaN(date.getTime()) && date < new Date();
 };
 
-// ── AdminReturns ──────────────────────────────────────────────────────────────
-
 const AdminReturns: React.FC = () => {
   const navigate = useNavigate();
   const [rentals, setRentals]           = useState<any[]>([]);
@@ -28,37 +18,32 @@ const AdminReturns: React.FC = () => {
   const [confirmOrder, setConfirmOrder] = useState<any | null>(null);
 
   useEffect(() => {
-  if (!isAuthenticated() || !isAdmin()) { navigate('/'); return; }
+    if (!isAuthenticated() || !isAdmin()) { navigate('/'); return; }
 
-  const load = async () => {
-    try {
-      const all = await apiGetOrders();
-      setRentals(all.filter((o: any) => o.status === 'รอรับคืน'));
-    } catch { setRentals([]); }
-  };
+    const load = async () => {
+      try {
+        const all = await apiGetOrders();
+        setRentals(all.filter((o: any) => o.status === 'รอรับคืน'));
+      } catch { setRentals([]); }
+    };
 
-  load();
-}, [navigate]);
+    load();
+  }, [navigate]);
 
   const handleReturnBook = useCallback(async (order: any) => {
-  try {
-    await apiUpdateOrderStatus(String(order.id), 'คืนหนังสือแล้ว');
-    setRentals(prev => prev.filter(r => r.id !== order.id));
-    setConfirmOrder(null);
-    setViewOrder(null);
-  } catch { alert('เกิดข้อผิดพลาด กรุณาลองใหม่'); }
-}, []);
-
-    
+    try {
+      await apiUpdateOrderStatus(String(order.id), 'คืนหนังสือแล้ว');
+      setRentals(prev => prev.filter(r => r.id !== order.id));
+      setConfirmOrder(null);
+      setViewOrder(null);
+    } catch { alert('เกิดข้อผิดพลาด กรุณาลองใหม่'); }
+  }, []);
 
   return (
     <main className="max-w-6xl mx-auto px-4 py-12 min-h-[80vh]">
       <h1 className="text-3xl font-black mb-2">ระบบจัดการร้าน (Admin)</h1>
-
-      {/* ใช้ AdminNav กลาง — prop ชื่อ pendingReturns ให้ตรงกับไฟล์ AdminNav.tsx */}
       <AdminNav pendingReturns={rentals.length} />
 
-      {/* Table */}
       <div className="bg-white dark:bg-[#1a3324] rounded-[2rem] shadow-xl overflow-hidden border border-gray-100 dark:border-white/5">
         <table className="w-full text-left">
           <thead className="bg-gray-50 dark:bg-black/20 text-xs uppercase text-gray-500">
@@ -97,7 +82,6 @@ const AdminReturns: React.FC = () => {
         </table>
       </div>
 
-      {/* Detail Modal */}
       {viewOrder && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setViewOrder(null)} />
@@ -110,7 +94,6 @@ const AdminReturns: React.FC = () => {
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
-
             <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
               <div className="grid grid-cols-2 gap-4 bg-primary/5 p-4 rounded-2xl border border-primary/10">
                 {[['ลูกค้า', viewOrder.customerName], ['เบอร์โทร', viewOrder.phone]].map(([label, value]) => (
@@ -124,7 +107,6 @@ const AdminReturns: React.FC = () => {
                   <p className={`font-black ${isOverdue(viewOrder.returnDate) ? 'text-red-500' : ''}`}>{viewOrder.returnDate}</p>
                 </div>
               </div>
-
               <h4 className="font-bold text-sm text-gray-500 uppercase tracking-wider">หนังสือที่ต้องเช็คสภาพ:</h4>
               <div className="space-y-3">
                 {viewOrder.items.map((item: any, idx: number) => (
@@ -140,7 +122,6 @@ const AdminReturns: React.FC = () => {
                 ))}
               </div>
             </div>
-
             <div className="p-6 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5 flex justify-end gap-3">
               <button onClick={() => setViewOrder(null)} className="px-5 py-2 rounded-xl font-bold border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors text-sm">ปิด</button>
               <button onClick={() => { setViewOrder(null); setConfirmOrder(viewOrder); }}
@@ -152,7 +133,6 @@ const AdminReturns: React.FC = () => {
         </div>
       )}
 
-      {/* Confirm Modal */}
       {confirmOrder && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmOrder(null)} />
