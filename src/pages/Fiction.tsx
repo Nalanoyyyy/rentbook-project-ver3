@@ -56,8 +56,8 @@ const Fiction: React.FC = () => {
           </div>
           <div className="p-6 bg-accent/10 rounded-3xl border border-accent/20">
             <p className="text-xs font-bold text-primary mb-1">PROMOTION</p>
-            <p className="text-sm font-bold text-[#0d1b13] dark:text-white">เช่า 3 เล่มขึ้นไป</p>
-            <p className="text-xs text-gray-500">ส่งฟรีทุกรายการ!</p>
+            <p className="text-sm font-bold text-[#0d1b13] dark:text-white">มีคูปองพิเศษมากมาย</p>
+            <p className="text-xs text-gray-500">สามารถดูได้ที่คูปองของฉัน!</p>
           </div>
         </aside>
 
