@@ -1,7 +1,7 @@
 // src/services/api.ts
 // แทนที่การใช้ localStorage ด้วย fetch เรียก backend
 
-const BASE = 'http://localhost:5000/api';
+const BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const getToken = () => sessionStorage.getItem('token') || '';
 
