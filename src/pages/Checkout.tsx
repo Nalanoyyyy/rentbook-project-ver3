@@ -202,7 +202,7 @@ const Checkout: React.FC = () => {
               <div>
                 <p className="text-xs font-bold text-primary mb-1 uppercase tracking-wider">กำหนดคืนหนังสือ</p>
                 <p className="text-sm font-black text-gray-800 dark:text-white mb-2">ภายในวันที่ {cartItems.length ? getReturnDate(cartItems) : '-'}</p>
-                <p className="text-[11px] text-gray-500 leading-relaxed">* คืนได้ที่จุดขนส่งใกล้บ้าน (Flash, Kerry, J&T)<br />* สอบถาม: <span className="font-bold text-primary">02-123-4567</span></p>
+                <p className="text-[11px] text-gray-500 leading-relaxed">* คืนได้ที่จุดขนส่งใกล้บ้าน (Flash, Kerry, J&T) แจ้งขนส่งว่าคืนหนังสือ RentBook<br />* สอบถาม: <span className="font-bold text-primary">02-123-4567</span></p>
               </div>
             </div>
 
