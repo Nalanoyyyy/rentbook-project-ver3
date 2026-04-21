@@ -49,7 +49,6 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
           isAvailable: { set: true },
         }
       });
-      // เช็ค stock หลังลด
       const book = await prisma.book.findUnique({ where: { id: Number(item.id) } });
       if (book && book.stock <= 0) {
         await prisma.book.update({ where: { id: book.id }, data: { isAvailable: false, status: 'ไม่ว่าง' } });
@@ -61,12 +60,19 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/orders/:id/status
-router.put('/:id/status', authenticate, requireAdmin, async (req: AuthRequest, res: Response) => {
+router.put('/:id/status', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { status } = req.body;
+    const isAdmin = req.user!.role === 'admin';
+
+    // ผู้ใช้ทั่วไปทำได้แค่ "รอรับคืน" เท่านั้น
+    if (!isAdmin && status !== 'รอรับคืน') {
+      return res.status(403).json({ error: 'ไม่มีสิทธิ์อัปเดตสถานะนี้' });
+    }
+
     await prisma.order.update({ where: { id: req.params.id }, data: { status } });
 
-    // คืน stock ถ้ารับคืนหนังสือ
+    // คืน stock ถ้า admin รับคืนหนังสือ
     if (status === 'คืนหนังสือแล้ว') {
       const items = await prisma.orderItem.findMany({ where: { orderId: req.params.id } });
       for (const item of items) {
