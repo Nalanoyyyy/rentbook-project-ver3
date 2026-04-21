@@ -1,0 +1,107 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              Int      @id @default(autoincrement())
+  email           String   @unique
+  password        String
+  fullName        String
+  nickname        String?
+  phone           String?
+  address         String?
+  role            String   @default("user")
+  isBlacklisted   Boolean  @default(false)
+  blacklistReason String?
+  createdAt       DateTime @default(now())
+  orders          Order[]
+  reviews         Review[]
+  wishlist        Wishlist[]
+}
+
+model Book {
+  id          Int        @id @default(autoincrement())
+  title       String
+  author      String
+  category    String
+  price       Float
+  stock       Int        @default(1)
+  image       String?
+  isAvailable Boolean    @default(true)
+  status      String     @default("พร้อมให้เช่า")
+  createdAt   DateTime   @default(now())
+  reviews     Review[]
+  wishlist    Wishlist[]
+  orderItems  OrderItem[]
+}
+
+model Order {
+  id           String      @id
+  userId       Int?
+  customerName String
+  phone        String
+  email        String
+  address      String
+  note         String?
+  total        Float
+  status       String      @default("รอดำเนินการ")
+  slip         String?
+  returnDate   String?
+  date         String
+  createdAt    DateTime    @default(now())
+  user         User?       @relation(fields: [userId], references: [id])
+  items        OrderItem[]
+}
+
+model OrderItem {
+  id      Int    @id @default(autoincrement())
+  orderId String
+  bookId  Int
+  title   String
+  price   Float
+  days    Int    @default(7)
+  image   String?
+  order   Order  @relation(fields: [orderId], references: [id])
+  book    Book   @relation(fields: [bookId], references: [id])
+}
+
+model Coupon {
+  id              Int      @id @default(autoincrement())
+  code            String   @unique
+  title           String
+  type            String   @default("PERCENT")
+  discountValue   Float
+  displayDiscount String
+  minSpend        Float    @default(0)
+  expiry          String
+  isActive        Boolean  @default(true)
+  usageCount      Int      @default(0)
+  totalDiscount   Float    @default(0)
+  createdAt       DateTime @default(now())
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  bookId    Int
+  userId    Int?
+  name      String
+  rating    Int      @default(5)
+  comment   String
+  createdAt DateTime @default(now())
+  book      Book     @relation(fields: [bookId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model Wishlist {
+  userId Int
+  bookId Int
+  user   User @relation(fields: [userId], references: [id])
+  book   Book @relation(fields: [bookId], references: [id])
+
+  @@id([userId, bookId])
+}

@@ -1,26 +1,23 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import BookCard from '../components/BookCard';
-import { getInventory } from '../services/inventoryService';
+import { apiGetWishlist } from '../services/api';
+import { isAuthenticated } from '../services/authService';
+import { PageSpinner } from '../components/Skeleton';
 
 const WishlistPage: React.FC = () => {
-  const [books,    setBooks]    = useState<any[]>([]);
-  const [wishlist, setWishlist] = useState<string[]>([]);
-
-  const load = useCallback(() => {
-    try {
-      const ids = JSON.parse(localStorage.getItem('wishlist') || '[]') as string[];
-      setWishlist(ids);
-      const all = getInventory() as any[];
-      setBooks(all.filter(b => ids.includes(String(b.id))));
-    } catch { setBooks([]); setWishlist([]); }
-  }, []);
+  const [books,   setBooks]   = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    load();
-    window.addEventListener('storage', load);
-    return () => window.removeEventListener('storage', load);
-  }, [load]);
+    if (!isAuthenticated()) { setLoading(false); return; }
+    apiGetWishlist()
+      .then(setBooks)
+      .catch(() => setBooks([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <PageSpinner />;
 
   return (
     <main className="max-w-6xl mx-auto px-4 py-12 min-h-[85vh]">
@@ -28,7 +25,7 @@ const WishlistPage: React.FC = () => {
         <span className="material-symbols-outlined text-4xl text-red-500">favorite</span>
         <div>
           <h1 className="text-3xl font-black">รายการโปรดของฉัน</h1>
-          <p className="text-gray-400 text-sm">{wishlist.length} รายการ</p>
+          <p className="text-gray-400 text-sm">{books.length} รายการ</p>
         </div>
       </div>
 

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiGetMe, apiUpdateMe } from '../services/api';
+import { logout } from '../services/authService';
 
-const SESSION_KEYS = ['isLoggedIn','isAuthenticated','userRole','userEmail','userName','userNickname','userPhone','userAddress'];
 const ss   = sessionStorage;
-const sGet = (k: string) => ss.getItem(k) || '';
+const sSet = (k: string, v: string) => ss.setItem(k, v);
 
 type UserData = { name: string; nickname: string; email: string; phone: string; address: string };
 
@@ -12,59 +13,41 @@ const Profile: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [userData,  setUserData]  = useState<UserData>({ name: '', nickname: '', email: '', phone: '', address: '' });
   const [toast,     setToast]     = useState('');
+  const [loading,   setLoading]   = useState(false);
 
   useEffect(() => {
-    setUserData({
-      name:     sGet('userName'),
-      nickname: sGet('userNickname'),
-      email:    sGet('userEmail'),
-      phone:    sGet('userPhone'),
-      address:  sGet('userAddress'),
-    });
-  }, []);
+    apiGetMe().then(user => {
+      const d = { name: user.fullName || '', nickname: user.nickname || '', email: user.email || '', phone: user.phone || '', address: user.address || '' };
+      setUserData(d);
+    }).catch(() => navigate('/login'));
+  }, [navigate]);
 
   const set = (k: keyof UserData, v: string) => setUserData(p => ({ ...p, [k]: v }));
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
-  const handleSave = useCallback(() => {
-    const t: UserData = {
-      name:     userData.name.trim(),
-      nickname: userData.nickname.trim(),
-      email:    userData.email.trim().toLowerCase(),
-      phone:    userData.phone.trim(),
-      address:  userData.address.trim(),
-    };
-
-    // sync กับ registeredUsers
-    const oldEmail = sGet('userEmail');
-    const users: any[] = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
-    localStorage.setItem('registeredUsers', JSON.stringify(
-      users.map(u => u.email === oldEmail ? { ...u, email: t.email, fullName: t.name, nickname: t.nickname, phone: t.phone, address: t.address } : u)
-    ));
-
-    // save ลง sessionStorage
-    ss.setItem('userName',     t.name);
-    ss.setItem('userNickname', t.nickname);
-    ss.setItem('userEmail',    t.email);
-    ss.setItem('userPhone',    t.phone);
-    ss.setItem('userAddress',  t.address);
-
-    setUserData(t);
-    window.dispatchEvent(new Event('authChange'));
-    setIsEditing(false);
-    showToast('บันทึกข้อมูลเรียบร้อยแล้ว');
+  const handleSave = useCallback(async () => {
+    setLoading(true);
+    try {
+      await apiUpdateMe({ fullName: userData.name.trim(), nickname: userData.nickname.trim(), email: userData.email.trim().toLowerCase(), phone: userData.phone.trim(), address: userData.address.trim() });
+      // อัปเดต sessionStorage
+      sSet('userName',     userData.name.trim());
+      sSet('userNickname', userData.nickname.trim());
+      sSet('userEmail',    userData.email.trim().toLowerCase());
+      sSet('userPhone',    userData.phone.trim());
+      sSet('userAddress',  userData.address.trim());
+      window.dispatchEvent(new Event('authChange'));
+      setIsEditing(false);
+      showToast('บันทึกข้อมูลเรียบร้อยแล้ว');
+    } catch (err: any) { showToast(err.message || 'เกิดข้อผิดพลาด'); }
+    finally { setLoading(false); }
   }, [userData]);
 
-  const handleLogout = () => {
-    SESSION_KEYS.forEach(k => ss.removeItem(k));
-    window.dispatchEvent(new Event('authChange'));
-    navigate('/');
-  };
+  const handleLogout = () => { logout(); navigate('/'); };
 
   const FIELDS: { key: keyof UserData; label: string; type?: string }[] = [
     { key: 'name',     label: 'ชื่อ-นามสกุลจริง' },
     { key: 'nickname', label: 'ชื่อเล่น'           },
-    { key: 'email',    label: 'อีเมล',    type: 'email' },
+    { key: 'email',    label: 'อีเมล', type: 'email' },
     { key: 'phone',    label: 'เบอร์โทรศัพท์', type: 'tel' },
   ];
 
@@ -75,7 +58,6 @@ const Profile: React.FC = () => {
           <span className="material-symbols-outlined text-green-400 dark:text-green-600 text-[18px]">check_circle</span>{toast}
         </div>
       )}
-
       <div className="bg-white dark:bg-white/5 rounded-[3rem] border border-[#e7f3ec] dark:border-[#1a3324] overflow-hidden shadow-xl">
         <div className="bg-gradient-to-r from-primary to-[#1a3324] p-10 text-white flex justify-between items-end">
           <div>
@@ -86,16 +68,13 @@ const Profile: React.FC = () => {
             <p className="opacity-70 text-sm">จัดการข้อมูลส่วนตัวและที่อยู่จัดส่งของคุณ</p>
           </div>
           <div className="flex gap-3">
-            {isEditing && (
-              <button onClick={() => setIsEditing(false)} className="px-6 py-3 rounded-2xl font-bold bg-white/10 hover:bg-white/20 transition-all">ยกเลิก</button>
-            )}
-            <button onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-              className={`px-8 py-3 rounded-2xl font-bold transition-all ${isEditing ? 'bg-white text-primary hover:scale-105' : 'bg-white/10 hover:bg-white/20'}`}>
-              {isEditing ? 'บันทึกข้อมูล' : 'แก้ไขข้อมูล'}
+            {isEditing && <button onClick={() => setIsEditing(false)} className="px-6 py-3 rounded-2xl font-bold bg-white/10 hover:bg-white/20 transition-all">ยกเลิก</button>}
+            <button onClick={() => isEditing ? handleSave() : setIsEditing(true)} disabled={loading}
+              className={`px-8 py-3 rounded-2xl font-bold transition-all disabled:opacity-60 ${isEditing ? 'bg-white text-primary hover:scale-105' : 'bg-white/10 hover:bg-white/20'}`}>
+              {loading ? 'กำลังบันทึก...' : isEditing ? 'บันทึกข้อมูล' : 'แก้ไขข้อมูล'}
             </button>
           </div>
         </div>
-
         <div className="p-10 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {FIELDS.map(({ key, label, type = 'text' }) => (
@@ -113,7 +92,6 @@ const Profile: React.FC = () => {
           </div>
         </div>
       </div>
-
       <div className="mt-8 flex justify-center">
         <button onClick={handleLogout} className="flex items-center gap-2 text-red-500 font-bold hover:bg-red-50 dark:hover:bg-red-500/10 px-6 py-3 rounded-xl transition-colors">
           <span className="material-symbols-outlined">logout</span>ออกจากระบบ

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import BookCard from '../components/BookCard';
 import Pagination from '../components/Pagination';
-import { getInventory } from '../services/inventoryService';
+import { apiGetBooks } from '../services/api';
 import { BookGridSkeleton } from '../components/Skeleton';
 
 const PER_PAGE = 12;
@@ -14,11 +14,12 @@ const Home: React.FC = () => {
   const [pages, setPages] = useState<Record<string, number>>({ cartoon: 1, fiction: 1, general: 1 });
 
   const [loading, setLoading] = useState(true);
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
   setLoading(true);
-  setBooks(getInventory());
+  const data = await apiGetBooks();
+  setBooks(data);
   setLoading(false);
-  }, []);
+}, []);
   
 
   useEffect(() => {

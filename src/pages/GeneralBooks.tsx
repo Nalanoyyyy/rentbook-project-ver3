@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import BookCard from '../components/BookCard';
 import Pagination from '../components/Pagination';
-import { getInventory } from '../services/inventoryService';
+import { apiGetBooks } from '../services/api';
 import { BookGridSkeleton } from '../components/Skeleton';
 
 const PER_PAGE = 12;
@@ -13,12 +13,14 @@ const GeneralBooks: React.FC = () => {
   const [page,     setPage]     = useState(1);
 
   const [loading, setLoading] = useState(true);
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
   setLoading(true);
-  setBooks(getInventory());
+  const data = await apiGetBooks();
+  setBooks(data);
   setLoading(false);
 }, []);
 
+  useEffect(() => { load(); }, [load]);
   const generalBooks = books.filter(b => {
     const cat = (b.category || '').toLowerCase();
     return cat.includes('general') || !['cartoon','การ์ตูน','มังงะ','fiction','นิยาย'].some(k => cat.includes(k));

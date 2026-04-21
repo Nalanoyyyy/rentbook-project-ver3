@@ -1,136 +1,68 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { apiRegister } from '../services/api';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
+  const [form,    setForm]    = useState({ fullName: '', nickname: '', email: '', phone: '', password: '', confirmPassword: '' });
+  const [error,   setError]   = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const [fullName,  setFullName]  = useState('');
-  const [nickname,  setNickname]  = useState('');
-  const [email,     setEmail]     = useState('');
-  const [phone,     setPhone]     = useState('');
-  const [password,  setPassword]  = useState('');
-  const [address,   setAddress]   = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [error,     setError]     = useState(''); // แทน alert()
+  const set = (k: keyof typeof form, v: string) => setForm(p => ({ ...p, [k]: v }));
 
-  const handleRegister = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    const regEmail    = email.trim().toLowerCase();
-    const regPassword = password.trim();
-
-    // ── Validation ────────────────────────────────────────────────────────────
-    if (!fullName.trim() || !nickname.trim() || !regEmail || !regPassword) {
-      setError('กรุณากรอกข้อมูลสำคัญให้ครบถ้วน');
-      return;
-    }
-    if (regPassword.length < 6) {
-      setError('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
-      return;
-    }
-
-    const existingUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
-
-    if (existingUsers.some((u: any) => u.email === regEmail)) {
-      setError('อีเมลนี้ถูกใช้งานแล้ว กรุณาใช้อีเมลอื่น');
-      return;
-    }
-
-    // ── Save ──────────────────────────────────────────────────────────────────
-    existingUsers.push({
-      email:    regEmail,
-      password: regPassword,
-      fullName: fullName.trim(),
-      nickname: nickname.trim(),
-      phone:    phone.trim(),
-      address:  address.trim(),
-    });
-    localStorage.setItem('registeredUsers', JSON.stringify(existingUsers));
-
-    // navigate ทันที ไม่ต้อง alert block UI
-    navigate('/login', { state: { registered: true } });
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault(); setError('');
+    if (form.password.length < 6)              { setError('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'); return; }
+    if (form.password !== form.confirmPassword) { setError('รหัสผ่านทั้งสองช่องไม่ตรงกัน'); return; }
+    setLoading(true);
+    try {
+      await apiRegister({ email: form.email.trim().toLowerCase(), password: form.password, fullName: form.fullName.trim(), nickname: form.nickname.trim(), phone: form.phone.trim() });
+      navigate('/login', { state: { registered: true } });
+    } catch (err: any) { setError(err.message || 'เกิดข้อผิดพลาด'); }
+    finally { setLoading(false); }
   };
+
+  const inputCls = "w-full h-14 px-6 rounded-2xl bg-gray-50 dark:bg-white/5 border border-transparent focus:border-primary/20 outline-none transition-all";
+  const FIELDS: { key: keyof typeof form; label: string; type?: string; ph: string }[] = [
+    { key: 'fullName',        label: 'ชื่อ-นามสกุลจริง', ph: 'กรอกชื่อ-นามสกุล'        },
+    { key: 'nickname',        label: 'ชื่อเล่น',          ph: 'กรอกชื่อเล่น'             },
+    { key: 'email',           label: 'อีเมล',             type: 'email',    ph: 'example@mail.com'      },
+    { key: 'phone',           label: 'เบอร์โทรศัพท์',    type: 'tel',      ph: '08X-XXX-XXXX'          },
+    { key: 'password',        label: 'รหัสผ่าน',          type: 'password', ph: 'อย่างน้อย 6 ตัวอักษร' },
+    { key: 'confirmPassword', label: 'ยืนยันรหัสผ่าน',   type: 'password', ph: 'กรอกรหัสผ่านอีกครั้ง' },
+  ];
 
   return (
     <main className="min-h-[85vh] flex items-center justify-center px-4 py-10">
-      <div className="max-w-xl w-full bg-white dark:bg-[#0f1712] p-8 md:p-12 rounded-[2.5rem] border border-[#e7f3ec] dark:border-[#1a3324] shadow-2xl">
-
+      <div className="max-w-md w-full bg-white dark:bg-white/5 p-8 md:p-12 rounded-[2.5rem] border border-[#e7f3ec] dark:border-[#1a3324] shadow-2xl">
         <div className="text-center mb-10">
           <div className="w-20 h-20 bg-primary/10 rounded-[2rem] mx-auto mb-4 flex items-center justify-center">
             <span className="material-symbols-outlined text-4xl text-primary">person_add</span>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">สร้างบัญชีใหม่</h1>
-          <p className="text-gray-500 mt-2 text-sm">สมัครสมาชิกเพื่อเช่าหนังสือและรับสิทธิพิเศษ</p>
+          <h1 className="text-3xl font-bold tracking-tight">สมัครสมาชิก</h1>
+          <p className="text-gray-500 mt-2 text-sm">สร้างบัญชีเพื่อเริ่มเช่าหนังสือ</p>
         </div>
-
-        <form onSubmit={handleRegister} className="space-y-4">
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              { label: 'ชื่อ-นามสกุล', value: fullName,  set: setFullName,  placeholder: 'สมชาย ใจดี',   required: true  },
-              { label: 'ชื่อเล่น',      value: nickname,  set: setNickname,  placeholder: 'สมชาย',        required: true  },
-              { label: 'อีเมล',         value: email,     set: setEmail,     placeholder: 'example@mail.com', required: true, type: 'email' },
-              { label: 'เบอร์โทรศัพท์', value: phone,     set: setPhone,     placeholder: '08X-XXX-XXXX', required: false, type: 'tel'   },
-            ].map(({ label, value, set, placeholder, required, type = 'text' }) => (
-              <div key={label} className="space-y-2">
-                <label className="text-xs font-black uppercase tracking-widest ml-1 opacity-60">
-                  {label}{required && <span className="text-red-500 ml-0.5">*</span>}
-                </label>
-                <input required={required} type={type} value={value}
-                  onChange={e => set(e.target.value)} placeholder={placeholder}
-                  className="w-full h-14 px-6 rounded-2xl bg-gray-50 dark:bg-white/5 border border-transparent focus:border-primary/20 outline-none transition-all" />
-              </div>
-            ))}
-          </div>
-
-          {/* Password */}
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest ml-1 opacity-60">
-              รหัสผ่าน <span className="text-red-500">*</span>
-            </label>
-            <div className="relative w-full">
-              <input required type={showPassword ? 'text' : 'password'} value={password}
-                onChange={e => setPassword(e.target.value)} minLength={6}
-                className="w-full h-14 px-6 rounded-2xl bg-gray-50 dark:bg-white/5 border border-transparent focus:border-primary/20 outline-none transition-all"
-                placeholder="อย่างน้อย 6 ตัวอักษร" />
-              <button type="button" onClick={() => setShowPassword(p => !p)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-gray-400 hover:text-primary transition-colors">
-                <span className="material-symbols-outlined !text-[24px]">{showPassword ? 'visibility' : 'visibility_off'}</span>
-              </button>
+        <form onSubmit={handleRegister} className="space-y-5">
+          {FIELDS.map(({ key, label, type = 'text', ph }) => (
+            <div key={key} className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest ml-1 opacity-60">{label}</label>
+              <input required type={type} placeholder={ph} value={form[key]} onChange={e => set(key, e.target.value)} className={inputCls} />
             </div>
-          </div>
-
-          {/* Address */}
-          <div className="space-y-2 pb-2">
-            <label className="text-xs font-black uppercase tracking-widest ml-1 opacity-60">ที่อยู่จัดส่ง (กรอกภายหลังได้)</label>
-            <textarea rows={2} value={address} onChange={e => setAddress(e.target.value)}
-              placeholder="บ้านเลขที่ หมู่ ซอย ถนน ตำบล อำเภอ จังหวัด รหัสไปรษณีย์"
-              className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-transparent focus:border-primary/20 outline-none transition-all resize-none" />
-          </div>
-
-          {/* Error inline — แทน alert() */}
+          ))}
           {error && (
             <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/30 text-red-600 dark:text-red-400 text-sm font-medium px-4 py-3 rounded-2xl">
-              <span className="material-symbols-outlined text-[18px] flex-shrink-0">error</span>
-              {error}
+              <span className="material-symbols-outlined text-[18px] flex-shrink-0">error</span>{error}
             </div>
           )}
-
-          <button type="submit"
-            className="w-full py-4 bg-primary text-white rounded-2xl font-bold text-lg hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-primary/20 mt-6">
-            ยืนยันการสมัครสมาชิก
+          <button type="submit" disabled={loading}
+            className="w-full py-4 bg-primary text-white rounded-2xl font-bold text-lg hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-primary/20 disabled:opacity-60 disabled:pointer-events-none flex items-center justify-center gap-2">
+            {loading && <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+            {loading ? 'กำลังสมัครสมาชิก...' : 'สมัครสมาชิกเลย'}
           </button>
-
         </form>
-
         <div className="mt-8 pt-6 border-t border-gray-100 dark:border-white/5 text-center text-sm">
-          <p className="text-gray-500">
-            มีบัญชีผู้ใช้งานอยู่แล้ว?
-            <Link to="/login" className="text-primary font-bold hover:underline ml-1">เข้าสู่ระบบเลย</Link>
-          </p>
+          <p className="text-gray-500">มีบัญชีอยู่แล้ว? <Link to="/login" className="text-primary font-bold hover:underline ml-1">เข้าสู่ระบบ</Link></p>
         </div>
-
       </div>
     </main>
   );

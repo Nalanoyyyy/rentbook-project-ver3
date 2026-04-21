@@ -1,30 +1,34 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isAdmin, isAuthenticated } from '../../services/authService';
-import { getInventory, saveInventory } from '../../services/inventoryService';
+import { apiGetBooks, apiUpdateBook } from '../../services/api';
 import AdminNav from './AdminNav';
-import type { Book } from './AdminProducts';
 
 const AdminInventory: React.FC = () => {
   const navigate = useNavigate();
-  const [books, setBooks]       = useState<Book[]>([]);
-  const [search, setSearch]     = useState('');
+  const [books,  setBooks]  = useState<any[]>([]);
+  const [search, setSearch] = useState('');
+  const [toast,  setToast]  = useState('');
 
   useEffect(() => {
     if (!isAuthenticated() || !isAdmin()) { navigate('/'); return; }
-    setBooks(getInventory() as Book[]);
+    apiGetBooks().then(setBooks).catch(() => navigate('/'));
   }, [navigate]);
 
-  const toggleBookStatus = useCallback((bookId: Book['id']) => {
-    setBooks(prev => {
-      const updated = prev.map(b =>
-        b.id === bookId
-          ? { ...b, isAvailable: !b.isAvailable, status: b.isAvailable ? 'ไม่ว่าง' : 'พร้อมให้เช่า' }
-          : b
-      );
-      saveInventory(updated);
-      return updated;
-    });
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2000); };
+
+  const toggleBookStatus = useCallback(async (book: any) => {
+    try {
+      await apiUpdateBook(book.id, {
+        ...book,
+        isAvailable: !book.isAvailable,
+        status: book.isAvailable ? 'ไม่ว่าง' : 'พร้อมให้เช่า'
+      });
+      setBooks(prev => prev.map(b =>
+        b.id === book.id ? { ...b, isAvailable: !b.isAvailable, status: b.isAvailable ? 'ไม่ว่าง' : 'พร้อมให้เช่า' } : b
+      ));
+      showToast('อัปเดตสถานะแล้ว');
+    } catch (err: any) { showToast(err.message || 'เกิดข้อผิดพลาด'); }
   }, []);
 
   const filtered = books.filter(b =>
@@ -33,8 +37,13 @@ const AdminInventory: React.FC = () => {
 
   return (
     <main className="max-w-6xl mx-auto px-4 py-12 min-h-[80vh]">
-      <h1 className="text-3xl font-black mb-2">ระบบจัดการร้าน (Admin)</h1>
+      {toast && (
+        <div className="fixed top-6 right-6 z-[200] bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-xl font-bold text-sm flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
+          <span className="material-symbols-outlined text-green-400 text-[18px]">check_circle</span>{toast}
+        </div>
+      )}
 
+      <h1 className="text-3xl font-black mb-2">ระบบจัดการร้าน (Admin)</h1>
       <AdminNav />
 
       <div className="relative mb-6">
@@ -60,7 +69,9 @@ const AdminInventory: React.FC = () => {
             ) : filtered.map(book => (
               <tr key={book.id} className="border-t border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                 <td className="p-4 flex items-center gap-4">
-                  <img src={book.image} className="w-10 h-14 rounded-lg object-cover shadow-sm" alt={book.title} />
+                  {book.image
+                    ? <img src={book.image} className="w-10 h-14 rounded-lg object-cover shadow-sm" alt={book.title} />
+                    : <div className="w-10 h-14 rounded-lg bg-gray-100 dark:bg-white/5 flex items-center justify-center"><span className="material-symbols-outlined text-gray-300">image</span></div>}
                   <div>
                     <span className="font-bold block">{book.title}</span>
                     <span className="text-xs text-gray-500">{book.author}</span>
@@ -73,7 +84,7 @@ const AdminInventory: React.FC = () => {
                   </span>
                 </td>
                 <td className="p-4">
-                  <button onClick={() => toggleBookStatus(book.id)}
+                  <button onClick={() => toggleBookStatus(book)}
                     className="text-xs font-bold bg-gray-800 dark:bg-white dark:text-black text-white px-4 py-2 rounded-lg hover:opacity-90 transition-all shadow-md">
                     สลับสถานะ
                   </button>

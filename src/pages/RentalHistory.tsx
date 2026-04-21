@@ -1,16 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-
-const ss     = sessionStorage;
-const sGet   = (k: string) => ss.getItem(k) || '';
-const isAuth = () => sGet('isLoggedIn') === 'true' || sGet('isAuthenticated') === 'true';
-const parse  = (k: string): any[] => { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch { return []; } };
-
-const getAllOrders = (): any[] => {
-  const seen = new Set();
-  return [...parse('admin_orders'), ...parse('allOrders')]
-    .filter(o => { const id = o.id || o.orderId; return id && !seen.has(id) && seen.add(id); });
-};
+import { apiGetOrders } from '../services/api';
+import { isAuthenticated } from '../services/authService';
+import { PageSpinner } from '../components/Skeleton';
 
 const STATUS_CLS: Record<string, string> = {
   'รอดำเนินการ':    'bg-yellow-100 text-yellow-700',
@@ -23,22 +15,18 @@ const STATUS_CLS: Record<string, string> = {
 
 const RentalHistoryPage: React.FC = () => {
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<any[]>([]);
-
-  const load = useCallback(() => {
-    const email = sGet('userEmail');
-    const name  = sGet('userName');
-    setOrders(getAllOrders().filter(o =>
-      (email && email !== '-' && o.email === email) || (name && o.customerName === name)
-    ));
-  }, []);
+  const [orders,  setOrders]  = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isAuth()) { navigate('/login'); return; }
-    load();
-    window.addEventListener('storage', load);
-    return () => window.removeEventListener('storage', load);
-  }, [navigate, load]);
+    if (!isAuthenticated()) { navigate('/login'); return; }
+    apiGetOrders()
+      .then(setOrders)
+      .catch(() => setOrders([]))
+      .finally(() => setLoading(false));
+  }, [navigate]);
+
+  if (loading) return <PageSpinner />;
 
   return (
     <main className="max-w-4xl mx-auto px-4 py-12 min-h-[85vh]">
@@ -57,20 +45,18 @@ const RentalHistoryPage: React.FC = () => {
             </Link>
           </div>
         ) : orders.map(o => (
-          <div key={o.id || o.orderId} className="bg-white dark:bg-[#1a3324] rounded-[2rem] border border-[#e7f3ec] dark:border-[#1a3324] shadow-sm overflow-hidden">
+          <div key={o.id} className="bg-white dark:bg-[#1a3324] rounded-[2rem] border border-[#e7f3ec] dark:border-[#1a3324] shadow-sm overflow-hidden">
             <div className="bg-gray-50 dark:bg-white/5 p-4 border-b border-gray-100 dark:border-white/5 flex flex-wrap justify-between items-center gap-4">
               <div>
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">รหัสคำสั่งเช่า</p>
-                <p className="font-black text-primary">{o.id || o.orderId}</p>
+                <p className="font-black text-primary">{o.id}</p>
               </div>
               <div className="flex gap-6 items-center">
                 <div className="text-right">
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">วันที่ทำรายการ</p>
-                  <p className="font-bold text-sm">{o.date || o.orderDate}</p>
+                  <p className="font-bold text-sm">{o.date}</p>
                 </div>
-                <span className={`px-4 py-1.5 rounded-full text-xs font-bold ${STATUS_CLS[o.status] || 'bg-yellow-100 text-yellow-700'}`}>
-                  {o.status || 'รอดำเนินการ'}
-                </span>
+                <span className={`px-4 py-1.5 rounded-full text-xs font-bold ${STATUS_CLS[o.status] || 'bg-yellow-100 text-yellow-700'}`}>{o.status}</span>
               </div>
             </div>
             <div className="p-6 space-y-4">
@@ -80,8 +66,8 @@ const RentalHistoryPage: React.FC = () => {
                     ? <img src={item.image} alt={item.title} className="w-12 h-16 object-cover rounded-lg shadow-sm" />
                     : <div className="w-12 h-16 bg-gray-200 dark:bg-white/10 rounded-lg flex items-center justify-center"><span className="material-symbols-outlined text-gray-400">book</span></div>}
                   <div className="flex-1">
-                    <p className="font-bold text-sm md:text-base">{item.title}</p>
-                    <p className="text-xs text-gray-500 mt-1">ระยะเวลาเช่า: <span className="font-bold text-gray-700 dark:text-gray-300">{item.days ? item.days / 7 : (item.rentweeks || 1)} สัปดาห์</span></p>
+                    <p className="font-bold text-sm">{item.title}</p>
+                    <p className="text-xs text-gray-500 mt-1">ระยะเวลาเช่า: <span className="font-bold">{item.days ? item.days / 7 : 1} สัปดาห์</span></p>
                   </div>
                   <p className="font-black text-primary pr-2">฿{Number(item.price || 0).toLocaleString()}</p>
                 </div>

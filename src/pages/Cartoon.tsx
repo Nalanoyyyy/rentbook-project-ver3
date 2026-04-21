@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import BookCard from '../components/BookCard';
 import Pagination from '../components/Pagination';
-import { getInventory } from '../services/inventoryService';
+import { apiGetBooks } from '../services/api';
 import { BookGridSkeleton } from '../components/Skeleton';
 
 const PER_PAGE = 12;
@@ -13,14 +13,15 @@ const Cartoon: React.FC = () => {
   const [page,     setPage]     = useState(1);
 
   const [loading, setLoading] = useState(true);
-  const load = useCallback(() => {
+ const load = useCallback(async () => {
   setLoading(true);
-  setBooks(getInventory());
+  const data = await apiGetBooks();
+  setBooks(data);
   setLoading(false);
 }, []);
 
   // reset หน้าเมื่อ filter เปลี่ยน
-  useEffect(() => setPage(1), [category]);
+  useEffect(() => { load(); }, [load]);
 
   const cartoonBooks = books.filter(b =>
     ['cartoon', 'การ์ตูน', 'มังงะ'].some(k => (b.category || '').toLowerCase().includes(k))

@@ -1,59 +1,35 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-
-const ss = sessionStorage;
+import { apiLogin } from '../services/api';
+import { setSession } from '../services/authService';
 
 const Login: React.FC = () => {
-  const navigate   = useNavigate();
-  const { state }  = useLocation();
+  const navigate  = useNavigate();
+  const { state } = useLocation();
 
   const [email,        setEmail]        = useState('');
   const [password,     setPassword]     = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error,        setError]        = useState('');
+  const [loading,      setLoading]      = useState(false);
 
   const successMsg =
     state?.registered    ? 'สมัครสมาชิกสำเร็จ! ยินดีต้อนรับ 🎉' :
     state?.passwordReset ? 'เปลี่ยนรหัสผ่านสำเร็จแล้ว' : '';
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-
-    const loginEmail    = email.trim().toLowerCase();
-    const loginPassword = password.trim();
-
-    if (!loginEmail || !loginPassword) { setError('กรุณากรอกข้อมูลให้ครบถ้วน'); return; }
-
-    // ── Admin ─────────────────────────────────────────────────────────────────
-    if (loginEmail === 'admin@rentbook.com' && loginPassword === '123456') {
-      ss.setItem('isLoggedIn',      'true');
-      ss.setItem('isAuthenticated', 'true');
-      ss.setItem('userRole',        'admin');
-      ss.setItem('userEmail',       loginEmail);
-      ss.setItem('userName',        'Admin Manager');
-      ss.setItem('userNickname',    'Admin');
+    setError(''); setLoading(true);
+    try {
+      const { token, user } = await apiLogin(email.trim().toLowerCase(), password.trim());
+      setSession(token, user);
       window.dispatchEvent(new Event('authChange'));
-      navigate('/admin/dashboard');
-      return;
+      navigate(user.role === 'admin' ? '/admin/dashboard' : '/');
+    } catch (err: any) {
+      setError(err.message || 'เกิดข้อผิดพลาด');
+    } finally {
+      setLoading(false);
     }
-
-    // ── User ──────────────────────────────────────────────────────────────────
-    const users = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
-    const found = users.find((u: any) => u.email === loginEmail && u.password === loginPassword);
-
-    if (!found) { setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง หรือยังไม่ได้สมัครสมาชิก'); return; }
-
-    ss.setItem('isLoggedIn',      'true');
-    ss.setItem('isAuthenticated', 'true');
-    ss.setItem('userRole',        'user');
-    ss.setItem('userEmail',       loginEmail);
-    ss.setItem('userName',        found.fullName || loginEmail.split('@')[0]);
-    ss.setItem('userNickname',    found.nickname || 'สมาชิก');
-    ss.setItem('userPhone',       found.phone    || '');
-    ss.setItem('userAddress',     found.address  || '');
-    window.dispatchEvent(new Event('authChange'));
-    navigate('/');
   };
 
   const inputCls = "w-full h-14 px-6 rounded-2xl bg-gray-50 dark:bg-white/5 border border-transparent focus:border-primary/20 focus:ring-4 ring-primary/10 text-lg transition-all outline-none";
@@ -104,9 +80,10 @@ const Login: React.FC = () => {
             </div>
           )}
 
-          <button type="submit"
-            className="w-full py-4 bg-primary text-white rounded-2xl font-bold text-lg hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-primary/20">
-            เข้าสู่ระบบเลย
+          <button type="submit" disabled={loading}
+            className="w-full py-4 bg-primary text-white rounded-2xl font-bold text-lg hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-primary/20 disabled:opacity-60 disabled:pointer-events-none flex items-center justify-center gap-2">
+            {loading && <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+            {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบเลย'}
           </button>
         </form>
 

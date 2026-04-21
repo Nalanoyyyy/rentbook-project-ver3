@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { getInventory } from '../services/inventoryService';
+import { apiGetBook, apiAddReview } from '../services/api';
+import { isAuthenticated } from '../services/authService';
+import { PageSpinner } from '../components/Skeleton';
 import NotifyMeButton from '../components/NotifyMeButton';
+import WishlistButton from '../components/WishlistButton';
 
-type Review = { name: string; rating: number; comment: string; date: string };
+const ss   = sessionStorage;
+const sGet = (k: string) => ss.getItem(k) || '';
 
-const ss     = sessionStorage;
-const sGet   = (k: string) => ss.getItem(k) || '';
-const isAuth = () => sGet('isLoggedIn') === 'true' || sGet('isAuthenticated') === 'true';
-
-const getReviews = (id: string): Review[] => { try { return JSON.parse(localStorage.getItem(`reviews_${id}`) || '[]'); } catch { return []; } };
-const saveReviews = (id: string, reviews: Review[]) => localStorage.setItem(`reviews_${id}`, JSON.stringify(reviews));
+type Review = { name: string; rating: number; comment: string; createdAt: string };
 
 const StarRating: React.FC<{ value: number; onChange?: (v: number) => void }> = ({ value, onChange }) => (
   <div className="flex gap-0.5">
@@ -26,64 +25,53 @@ const BookDetail: React.FC = () => {
   const navigate = useNavigate();
 
   const [book,      setBook]      = useState<any>(null);
-  const [related,   setRelated]   = useState<any[]>([]);
   const [reviews,   setReviews]   = useState<Review[]>([]);
+  const [related,   setRelated]   = useState<any[]>([]);
   const [weeks,     setWeeks]     = useState(1);
   const [inCart,    setInCart]    = useState(false);
   const [toast,     setToast]     = useState('');
+  const [loading,   setLoading]   = useState(true);
   const [rating,    setRating]    = useState(5);
   const [comment,   setComment]   = useState('');
   const [reviewErr, setReviewErr] = useState('');
 
-  const load = useCallback(() => {
-    const books = getInventory() as any[];
-    const found = books.find(b => String(b.id) === String(id));
-    if (!found) { navigate('/'); return; }
-    setBook(found);
-    setReviews(getReviews(String(id)));
-    setRelated(books.filter(b =>
-      String(b.id) !== String(id) &&
-      (b.category || '').split(',').some((c: string) => (found.category || '').toLowerCase().includes(c.trim().toLowerCase()))
-    ).slice(0, 4));
-    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-    setInCart(cart.some((i: any) => String(i.id) === String(id)));
+  const load = useCallback(async () => {
+    try {
+      const data = await apiGetBook(id!);
+      setBook(data); setReviews(data.reviews || []);
+      const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+      setInCart(cart.some((i: any) => String(i.id) === String(id)));
+    } catch { navigate('/'); }
+    finally { setLoading(false); }
   }, [id, navigate]);
 
-  useEffect(() => {
-    load();
-    window.addEventListener('storage', load);
-    return () => window.removeEventListener('storage', load);
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
   const addToCart = () => {
-    if (!isAuth()) { navigate('/login'); return; }
-    if (inCart)    { navigate('/cart');  return; }
+    if (!isAuthenticated()) { navigate('/login'); return; }
+    if (inCart) { navigate('/cart'); return; }
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
     localStorage.setItem('cart', JSON.stringify([...cart, { ...book, rentweeks: weeks }]));
     window.dispatchEvent(new Event('storage'));
-    setInCart(true);
-    showToast('เพิ่มลงตะกร้าแล้ว!');
+    setInCart(true); showToast('เพิ่มลงตะกร้าแล้ว!');
   };
 
-  const submitReview = (e: React.FormEvent) => {
+  const submitReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAuth())       { navigate('/login'); return; }
+    if (!isAuthenticated()) { navigate('/login'); return; }
     if (!comment.trim()) { setReviewErr('กรุณาเขียนความคิดเห็น'); return; }
-    const r: Review = {
-      name:    sGet('userNickname') || sGet('userName') || 'ผู้ใช้งาน',
-      rating, comment: comment.trim(),
-      date:    new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }),
-    };
-    const updated = [r, ...reviews];
-    saveReviews(String(id), updated);
-    setReviews(updated);
-    setComment(''); setRating(5); setReviewErr('');
-    showToast('ขอบคุณสำหรับรีวิว!');
+    try {
+      await apiAddReview(id!, { rating, comment: comment.trim(), name: sGet('userNickname') || sGet('userName') || 'ผู้ใช้งาน' });
+      await load();
+      setComment(''); setRating(5); setReviewErr('');
+      showToast('ขอบคุณสำหรับรีวิว!');
+    } catch (err: any) { setReviewErr(err.message || 'เกิดข้อผิดพลาด'); }
   };
 
-  if (!book) return null;
+  if (loading) return <PageSpinner />;
+  if (!book)   return null;
 
   const isAvail   = book.isAvailable && book.stock > 0;
   const total     = book.price * weeks;
@@ -99,22 +87,21 @@ const BookDetail: React.FC = () => {
 
       <nav className="flex items-center gap-2 text-xs text-gray-400 mb-8">
         <Link to="/" className="hover:text-primary transition-colors">หน้าแรก</Link>
-        <span>/</span>
-        <span className="text-gray-600 dark:text-gray-200 font-medium truncate">{book.title}</span>
+        <span>/</span><span className="text-gray-600 dark:text-gray-200 font-medium truncate">{book.title}</span>
       </nav>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-16">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-full max-w-sm aspect-[3/4] rounded-[2rem] overflow-hidden shadow-2xl shadow-black/20">
-            {book.image ? <img src={book.image} alt={book.title} className="w-full h-full object-cover" />
-              : <div className="w-full h-full bg-gray-100 dark:bg-white/5 flex items-center justify-center"><span className="material-symbols-outlined text-6xl text-gray-300">image</span></div>}
+          <div className="w-full max-w-sm aspect-[3/4] rounded-[2rem] overflow-hidden shadow-2xl shadow-black/20 relative">
+            {book.image ? <img src={book.image} alt={book.title} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-100 dark:bg-white/5 flex items-center justify-center"><span className="material-symbols-outlined text-6xl text-gray-300">image</span></div>}
+            <WishlistButton bookId={book.id} className="absolute top-3 right-3" />
           </div>
-
-          <span className={`px-4 py-1.5 rounded-full ...`}>
-            {isAvail ? `พร้อมให้เช่า · เหลือ ${book.stock} เล่ม` : 'ไม่ว่างในขณะนี้'}
-          </span>
-          <NotifyMeButton bookId={book.id} isAvailable={isAvail} />
-          
+          <div className="flex items-center gap-3">
+            <span className={`px-4 py-1.5 rounded-full text-sm font-bold ${isAvail ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+              {isAvail ? `พร้อมให้เช่า · เหลือ ${book.stock} เล่ม` : 'ไม่ว่างในขณะนี้'}
+            </span>
+            <NotifyMeButton bookId={book.id} isAvailable={isAvail} />
+          </div>
         </div>
 
         <div className="flex flex-col">
@@ -163,46 +150,19 @@ const BookDetail: React.FC = () => {
         </div>
       </div>
 
-      {related.length > 0 && (
-        <section className="mb-16">
-          <h2 className="text-2xl font-black mb-6 flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">recommend</span>หนังสือที่เกี่ยวข้อง
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {related.map(b => (
-              <Link key={b.id} to={`/book/${b.id}`}
-                className="group bg-white dark:bg-white/5 rounded-2xl overflow-hidden border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all">
-                <div className="aspect-[3/4] overflow-hidden">
-                  <img src={b.image} alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                </div>
-                <div className="p-3">
-                  <p className="font-bold text-sm truncate">{b.title}</p>
-                  <p className="text-xs text-gray-400 truncate">{b.author}</p>
-                  <p className="text-primary font-bold text-sm mt-1">฿{b.price.toLocaleString()} <span className="text-gray-400 font-normal text-xs">/สัปดาห์</span></p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
+      {/* Reviews */}
       <section>
         <h2 className="text-2xl font-black mb-6 flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary">reviews</span>
-          รีวิวจากผู้เช่า
+          <span className="material-symbols-outlined text-primary">reviews</span>รีวิวจากผู้เช่า
           {reviews.length > 0 && <span className="text-base font-medium text-gray-400">({reviews.length})</span>}
         </h2>
-
         <div className="bg-white dark:bg-white/5 rounded-[2rem] border border-gray-100 dark:border-white/5 p-6 mb-8 shadow-sm">
           <h3 className="font-bold mb-4">เขียนรีวิว</h3>
-          {!isAuth() ? (
+          {!isAuthenticated() ? (
             <p className="text-gray-400 text-sm"><Link to="/login" className="text-primary font-bold hover:underline">เข้าสู่ระบบ</Link> เพื่อเขียนรีวิว</p>
           ) : (
             <form onSubmit={submitReview} className="space-y-4">
-              <div>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">คะแนน</p>
-                <StarRating value={rating} onChange={setRating} />
-              </div>
+              <div><p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">คะแนน</p><StarRating value={rating} onChange={setRating} /></div>
               <div>
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">ความคิดเห็น</p>
                 <textarea rows={3} value={comment} onChange={e => { setComment(e.target.value); setReviewErr(''); }}
@@ -214,7 +174,6 @@ const BookDetail: React.FC = () => {
             </form>
           )}
         </div>
-
         {reviews.length === 0 ? (
           <div className="text-center py-12 bg-gray-50 dark:bg-white/5 rounded-[2rem] border-2 border-dashed border-gray-200 dark:border-white/10">
             <span className="material-symbols-outlined text-4xl text-gray-300 mb-2 block">rate_review</span>
@@ -229,10 +188,7 @@ const BookDetail: React.FC = () => {
                     <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                       <span className="font-black text-primary text-sm">{r.name.charAt(0)}</span>
                     </div>
-                    <div>
-                      <p className="font-bold text-sm">{r.name}</p>
-                      <p className="text-xs text-gray-400">{r.date}</p>
-                    </div>
+                    <div><p className="font-bold text-sm">{r.name}</p><p className="text-xs text-gray-400">{new Date(r.createdAt).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</p></div>
                   </div>
                   <StarRating value={r.rating} />
                 </div>
