@@ -2,12 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { isAdmin } from '../services/authService';
 import { getInventory } from '../services/inventoryService';
+import { apiGetBooks } from '../services/api';
 
 const SESSION_KEYS = ['isLoggedIn','isAuthenticated','userRole','userEmail','userName','userNickname','userPhone','userAddress'];
 const ss      = sessionStorage;
 const sGet    = (k: string) => ss.getItem(k) || '';
 const isAuth  = () => sGet('isLoggedIn') === 'true' || sGet('isAuthenticated') === 'true';
 const getNick = () => sGet('userNickname') || sGet('userName') || 'สมาชิก';
+const [allBooks, setAllBooks] = useState<any[]>([]);
 const getCouponCount = () => { try { const s = localStorage.getItem('couponsData'); return s ? JSON.parse(s).filter((c:any)=>c.isActive).length : 2; } catch { return 0; } };
 
 const NAV = [['/', 'หน้าแรก'], ['/cartoon', 'การ์ตูน'], ['/fiction', 'นิยาย'], ['/general-books', 'หนังสือทั่วไป'], ['/how-to-rent', 'วิธีการเช่า']];
@@ -37,10 +39,11 @@ const Navbar: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    sync();
-    ['storage', 'authChange'].forEach(e => window.addEventListener(e, sync));
-    return () => ['storage', 'authChange'].forEach(e => window.removeEventListener(e, sync));
-  }, [sync]);
+  sync();
+  apiGetBooks().then(setAllBooks).catch(() => {});
+  ['storage', 'authChange'].forEach(e => window.addEventListener(e, sync));
+  return () => ['storage', 'authChange'].forEach(e => window.removeEventListener(e, sync));
+}, [sync]);
 
   const logout = () => {
     SESSION_KEYS.forEach(k => ss.removeItem(k));
@@ -56,9 +59,14 @@ const Navbar: React.FC = () => {
   };
 
   const onQueryChange = (v: string) => {
-    setQuery(v);
-    if (v.trim()) { setSuggestions(getInventory().filter((b:any) => b.title?.toLowerCase().includes(v.toLowerCase())).slice(0,5)); setShowSug(true); }
-    else { setSuggestions([]); setShowSug(false); }
+  setQuery(v);
+  if (v.trim()) {
+    setSuggestions(allBooks.filter((b: any) => b.title?.toLowerCase().includes(v.toLowerCase())).slice(0, 5));
+    setShowSug(true);
+  } else {
+    setSuggestions([]);
+    setShowSug(false);
+  }
   };
 
   const nlCls = ({ isActive }: { isActive: boolean }) =>
