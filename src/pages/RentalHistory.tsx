@@ -1,22 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { apiGetOrders } from '../services/api';
+import { apiGetOrders, apiUpdateOrderStatus } from '../services/api';
 import { isAuthenticated } from '../services/authService';
 import { PageSpinner } from '../components/Skeleton';
+
 
 const STATUS_CLS: Record<string, string> = {
   'รอดำเนินการ':    'bg-yellow-100 text-yellow-700',
   'ยืนยันแล้ว':     'bg-blue-100 text-blue-700',
   'กำลังจัดส่ง':    'bg-blue-100 text-blue-700',
+  'รอรับคืน': 'bg-orange-100 text-orange-700',
   'คืนหนังสือแล้ว': 'bg-green-100 text-green-700',
   'สำเร็จ':         'bg-green-100 text-green-700',
   'ยกเลิก':         'bg-red-100 text-red-600',
 };
 
+
 const RentalHistoryPage: React.FC = () => {
   const navigate = useNavigate();
   const [orders,  setOrders]  = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const handleReturn = async (orderId: string) => {
+    if (!window.confirm('ยืนยันการคืนหนังสือ?')) return;
+    try {
+      await apiUpdateOrderStatus(orderId, 'รอรับคืน');
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'รอรับคืน' } : o));
+    } catch { alert('เกิดข้อผิดพลาด กรุณาลองใหม่'); }
+  };
 
   useEffect(() => {
     if (!isAuthenticated()) { navigate('/login'); return; }
@@ -76,6 +87,14 @@ const RentalHistoryPage: React.FC = () => {
                 <div>
                   <p className="text-xs text-red-500 font-bold mb-1">กำหนดคืนหนังสือภายใน:</p>
                   <p className="font-bold text-sm">{o.returnDate || '-'}</p>
+                   {(o.status === 'ยืนยันแล้ว' || o.status === 'กำลังจัดส่ง') && (
+              <button onClick={() => handleReturn(String(o.id))}
+              className="mt-3 px-4 py-2 bg-green-500 text-white text-xs font-bold rounded-xl hover:bg-green-600 transition-colors flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm">assignment_return</span>
+              ยืนยันการคืนหนังสือ
+              </button>
+              )}
+
                 </div>
                 <div className="text-right">
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">ยอดชำระสุทธิ</p>

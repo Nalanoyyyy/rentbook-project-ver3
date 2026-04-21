@@ -1,3 +1,4 @@
+import { apiGetOrders, apiUpdateOrderStatus } from '../../services/api';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isAdmin, isAuthenticated } from '../../services/authService';
@@ -27,42 +28,28 @@ const AdminReturns: React.FC = () => {
   const [confirmOrder, setConfirmOrder] = useState<any | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated() || !isAdmin()) { navigate('/'); return; }
+  if (!isAuthenticated() || !isAdmin()) { navigate('/'); return; }
 
-    const load = () => {
-      const all = [...parseOrders('admin_orders'), ...parseOrders('allOrders')];
-      const seen = new Set();
-      setRentals(all.filter(o => {
-        if (seen.has(o.id) || ['รอดำเนินการ', 'คืนหนังสือแล้ว', 'ยกเลิก'].includes(o.status)) return false;
-        seen.add(o.id);
-        return true;
-      }));
-    };
+  const load = async () => {
+    try {
+      const all = await apiGetOrders();
+      setRentals(all.filter((o: any) => o.status === 'รอรับคืน'));
+    } catch { setRentals([]); }
+  };
 
-    load();
-    window.addEventListener('storage', load);
-    return () => window.removeEventListener('storage', load);
-  }, [navigate]);
+  load();
+}, [navigate]);
 
-  const handleReturnBook = useCallback((order: any) => {
-    ['admin_orders', 'allOrders'].forEach(key =>
-      localStorage.setItem(key, JSON.stringify(
-        parseOrders(key).map((o: any) => o.id === order.id ? { ...o, status: 'คืนหนังสือแล้ว' } : o)
-      ))
-    );
-
-    const returnedIds = new Set(order.items.map((i: any) => String(i.id)));
-    saveInventory(getInventory().map((b: any) =>
-      returnedIds.has(String(b.id))
-        ? { ...b, stock: (b.stock || 0) + 1, isAvailable: true, status: 'พร้อมให้เช่า' }
-        : b
-    ));
-
-    window.dispatchEvent(new Event('storage'));
+  const handleReturnBook = useCallback(async (order: any) => {
+  try {
+    await apiUpdateOrderStatus(String(order.id), 'คืนหนังสือแล้ว');
     setRentals(prev => prev.filter(r => r.id !== order.id));
     setConfirmOrder(null);
     setViewOrder(null);
-  }, []);
+  } catch { alert('เกิดข้อผิดพลาด กรุณาลองใหม่'); }
+}, []);
+
+    
 
   return (
     <main className="max-w-6xl mx-auto px-4 py-12 min-h-[80vh]">
