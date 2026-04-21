@@ -9,7 +9,6 @@ const ss      = sessionStorage;
 const sGet    = (k: string) => ss.getItem(k) || '';
 const isAuth  = () => sGet('isLoggedIn') === 'true' || sGet('isAuthenticated') === 'true';
 const getNick = () => sGet('userNickname') || sGet('userName') || 'สมาชิก';
-const [allBooks, setAllBooks] = useState<any[]>([]);
 const getCouponCount = () => { try { const s = localStorage.getItem('couponsData'); return s ? JSON.parse(s).filter((c:any)=>c.isActive).length : 2; } catch { return 0; } };
 
 const NAV = [['/', 'หน้าแรก'], ['/cartoon', 'การ์ตูน'], ['/fiction', 'นิยาย'], ['/general-books', 'หนังสือทั่วไป'], ['/how-to-rent', 'วิธีการเช่า']];
@@ -31,6 +30,7 @@ const Navbar: React.FC = () => {
   const [loggedIn,    setLoggedIn]    = useState(isAuth());
   const [admin,       setAdmin]       = useState(isAdmin());
   const [nick,        setNick]        = useState(getNick());
+  const [allBooks, setAllBooks] = useState<any[]>([]); // ❌ อยู่นอก component
   const [coupons,     setCoupons]     = useState(getCouponCount());
 
   const sync = useCallback(() => {
