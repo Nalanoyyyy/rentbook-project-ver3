@@ -4,11 +4,19 @@ import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-// GET /api/coupons — active only
-router.get('/', async (req: Request, res: Response) => {
+// GET /api/coupons — active and unused by current user
+router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const coupons = await prisma.coupon.findMany({ where: { isActive: true } });
-    res.json(coupons);
+
+    const usedOrders = await prisma.order.findMany({
+      where: { userId: req.user!.id, couponCode: { not: null } },
+      select: { couponCode: true }
+    });
+    const usedCodes = new Set(usedOrders.map(o => o.couponCode));
+    const available = coupons.filter(c => !usedCodes.has(c.code));
+
+    res.json(available);
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
@@ -28,7 +36,6 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response) => 
     if (!coupon) return res.status(404).json({ error: 'ไม่พบโค้ดนี้ หรือโค้ดถูกปิดการใช้งาน' });
     if (subtotal < coupon.minSpend) return res.status(400).json({ error: `ใช้ได้เมื่อเช่าขั้นต่ำ ฿${coupon.minSpend}` });
 
-    // เช็คว่า user นี้เคยใช้คูปองนี้แล้วไหม
     const alreadyUsed = await prisma.order.findFirst({
       where: { userId: req.user!.id, couponCode: coupon.code }
     });
