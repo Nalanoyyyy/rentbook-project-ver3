@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { isAdmin } from '../services/authService';
-import { getInventory } from '../services/inventoryService';
 import { apiGetBooks } from '../services/api';
 
 const SESSION_KEYS = ['isLoggedIn','isAuthenticated','userRole','userEmail','userName','userNickname','userPhone','userAddress'];
@@ -19,6 +18,24 @@ const MENU_ITEMS = isAdmin() ? [] : [
   { to: '/wishlist',       icon: 'favorite',            label: 'รายการโปรด'     },
 ];
 
+// ย้าย SearchBox ออกมาข้างนอก Navbar
+type SearchBoxProps = {
+  mobile?: boolean;
+  query: string;
+  onQueryChange: (v: string) => void;
+  onSubmit: () => void;
+};
+
+const SearchBox: React.FC<SearchBoxProps> = ({ mobile, query, onQueryChange, onSubmit }) => (
+  <form onSubmit={e => { e.preventDefault(); onSubmit(); }}
+    className={mobile ? 'flex items-center bg-gray-100 dark:bg-white/5 px-4 py-3 rounded-xl' : 'flex items-center bg-gray-100 dark:bg-white/5 px-4 py-2 rounded-xl border border-transparent focus-within:border-primary/30 transition-all'}>
+    <span className="material-symbols-outlined text-gray-400 text-xl mr-1">search</span>
+    <input type="text" placeholder={mobile ? 'ค้นหาหนังสือ...' : 'ค้นหา...'} value={query}
+      onChange={e => onQueryChange(e.target.value)}
+      className={`bg-transparent border-none outline-none px-1 text-sm ${mobile ? 'w-full font-medium' : 'w-32 xl:w-48 focus:w-64 transition-all'}`} />
+  </form>
+);
+
 const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const [menuOpen,    setMenuOpen]    = useState(false);
@@ -30,7 +47,7 @@ const Navbar: React.FC = () => {
   const [loggedIn,    setLoggedIn]    = useState(isAuth());
   const [admin,       setAdmin]       = useState(isAdmin());
   const [nick,        setNick]        = useState(getNick());
-  const [allBooks, setAllBooks] = useState<any[]>([]); 
+  const [allBooks,    setAllBooks]    = useState<any[]>([]);
   const [coupons,     setCoupons]     = useState(getCouponCount());
 
   const sync = useCallback(() => {
@@ -39,11 +56,11 @@ const Navbar: React.FC = () => {
   }, []);
 
   useEffect(() => {
-  sync();
-  apiGetBooks().then(setAllBooks).catch(() => {});
-  ['storage', 'authChange'].forEach(e => window.addEventListener(e, sync));
-  return () => ['storage', 'authChange'].forEach(e => window.removeEventListener(e, sync));
-}, [sync]);
+    sync();
+    apiGetBooks().then(setAllBooks).catch(() => {});
+    ['storage', 'authChange'].forEach(e => window.addEventListener(e, sync));
+    return () => ['storage', 'authChange'].forEach(e => window.removeEventListener(e, sync));
+  }, [sync]);
 
   const logout = () => {
     SESSION_KEYS.forEach(k => ss.removeItem(k));
@@ -59,32 +76,18 @@ const Navbar: React.FC = () => {
   };
 
   const onQueryChange = (v: string) => {
-  setQuery(v);
-  if (v.trim()) {
-    const filtered = allBooks
-      .filter((b: any) => b.title?.toLowerCase().includes(v.toLowerCase()))
-      .slice(0, 5);
-    setSuggestions(filtered);
-    setShowSug(true);
-  } else {
-    setSuggestions([]);
-    setShowSug(false);
-  }
-};
+    setQuery(v);
+    if (v.trim()) {
+      setSuggestions(allBooks.filter((b: any) => b.title?.toLowerCase().includes(v.toLowerCase())).slice(0, 5));
+      setShowSug(true);
+    } else {
+      setSuggestions([]);
+      setShowSug(false);
+    }
+  };
 
   const nlCls = ({ isActive }: { isActive: boolean }) =>
     `text-sm font-medium transition-all duration-200 ${isActive ? 'text-primary dark:text-accent font-bold border-b-2 border-primary dark:border-accent pb-1' : 'hover:text-primary dark:hover:text-accent text-gray-600 dark:text-gray-300'}`;
-
-  const SearchBox = ({ mobile }: { mobile?: boolean }) => (
-    <form onSubmit={e => { e.preventDefault(); doSearch(query); }}
-      className={mobile ? 'flex items-center bg-gray-100 dark:bg-white/5 px-4 py-3 rounded-xl' : 'flex items-center bg-gray-100 dark:bg-white/5 px-4 py-2 rounded-xl border border-transparent focus-within:border-primary/30 transition-all'}>
-      <span className="material-symbols-outlined text-gray-400 text-xl mr-1">search</span>
-      <input type="text" placeholder={mobile ? 'ค้นหาหนังสือ...' : 'ค้นหา...'} value={query}
-        onChange={e => onQueryChange(e.target.value)}
-        onBlur={mobile ? undefined : () => setTimeout(() => setShowSug(false), 200)}
-        className={`bg-transparent border-none outline-none px-1 text-sm ${mobile ? 'w-full font-medium' : 'w-32 xl:w-48 focus:w-64 transition-all'}`} />
-    </form>
-  );
 
   return (
     <header className="sticky top-0 z-50 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-[#e7f3ec] dark:border-[#1a3324] px-4 md:px-10 py-3">
@@ -104,7 +107,7 @@ const Navbar: React.FC = () => {
 
         <div className="flex items-center gap-2 md:gap-4">
           <div className="relative hidden lg:block">
-            <SearchBox />
+            <SearchBox query={query} onQueryChange={onQueryChange} onSubmit={() => doSearch(query)} />
             {showSug && suggestions.length > 0 && (
               <div className="absolute top-12 left-0 right-0 bg-white dark:bg-[#1a3324] border border-[#e7f3ec] dark:border-[#1a3324] rounded-2xl shadow-2xl overflow-hidden z-[60]">
                 {suggestions.map(b => (
@@ -174,7 +177,7 @@ const Navbar: React.FC = () => {
         <div className="xl:hidden absolute top-full left-0 w-full bg-white dark:bg-[#0f1712] border-b border-gray-100 dark:border-white/10 shadow-2xl py-6 px-4 flex flex-col gap-2 z-40 animate-in slide-in-from-top duration-300">
           {NAV.map(([to, label]) => <NavLink key={to} to={to} onClick={() => setMobileOpen(false)} className="text-lg font-bold p-3 hover:bg-primary/5 rounded-xl transition-colors">{label}</NavLink>)}
           <hr className="my-2 opacity-50" />
-          <SearchBox mobile />
+          <SearchBox mobile query={query} onQueryChange={onQueryChange} onSubmit={() => doSearch(query)} />
         </div>
       )}
     </header>
