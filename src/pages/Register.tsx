@@ -7,6 +7,8 @@ const Register: React.FC = () => {
   const [form,    setForm]    = useState({ fullName: '', nickname: '', email: '', phone: '', password: '', confirmPassword: '' });
   const [error,   setError]   = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const set = (k: keyof typeof form, v: string) => setForm(p => ({ ...p, [k]: v }));
 
@@ -28,8 +30,8 @@ const Register: React.FC = () => {
     { key: 'nickname',        label: 'ชื่อเล่น',          ph: 'กรอกชื่อเล่น'             },
     { key: 'email',           label: 'อีเมล',             type: 'email',    ph: 'example@mail.com'      },
     { key: 'phone',           label: 'เบอร์โทรศัพท์',    type: 'tel',      ph: '08X-XXX-XXXX'          },
-    { key: 'password',        label: 'รหัสผ่าน',          type: 'password', ph: 'อย่างน้อย 6 ตัวอักษร' },
-    { key: 'confirmPassword', label: 'ยืนยันรหัสผ่าน',   type: 'password', ph: 'กรอกรหัสผ่านอีกครั้ง' },
+    { key: 'password',        label: 'รหัสผ่าน',        ph: 'อย่างน้อย 6 ตัวอักษร' },
+    { key: 'confirmPassword', label: 'ยืนยันรหัสผ่าน',    ph: 'กรอกรหัสผ่านอีกครั้ง' },
   ];
 
   return (
@@ -44,11 +46,35 @@ const Register: React.FC = () => {
         </div>
         <form onSubmit={handleRegister} className="space-y-5">
           {FIELDS.map(({ key, label, type = 'text', ph }) => (
-            <div key={key} className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-widest ml-1 opacity-60">{label}</label>
-              <input required type={type} placeholder={ph} value={form[key]} onChange={e => set(key, e.target.value)} className={inputCls} />
-            </div>
-          ))}
+        <div key={key} className="space-y-2">
+        <label className="text-xs font-black uppercase tracking-widest ml-1 opacity-60">{label}</label>
+        <div className="relative">
+        <input
+        required
+        type={
+          key === 'password' ? (showPassword ? 'text' : 'password') :
+          key === 'confirmPassword' ? (showConfirm ? 'text' : 'password') :
+          type
+        }
+        placeholder={ph}
+        value={form[key]}
+        onChange={e => set(key, e.target.value)}
+        className={inputCls + ' pr-14'}
+      />
+      {(key === 'password' || key === 'confirmPassword') && (
+        <button
+          type="button"
+          onClick={() => key === 'password' ? setShowPassword(p => !p) : setShowConfirm(p => !p)}
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+        >
+          <span className="material-symbols-outlined text-[22px]">
+            {key === 'password' ? (showPassword ? 'visibility_off' : 'visibility') : (showConfirm ? 'visibility_off' : 'visibility')}
+          </span>
+        </button>
+      )}
+    </div>
+  </div>
+))}
           {error && (
             <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/30 text-red-600 dark:text-red-400 text-sm font-medium px-4 py-3 rounded-2xl">
               <span className="material-symbols-outlined text-[18px] flex-shrink-0">error</span>{error}
