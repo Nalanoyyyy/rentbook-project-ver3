@@ -89,6 +89,8 @@ const Checkout: React.FC = () => {
       const { orderId } = await apiCreateOrder({
         customerName: name.trim(), phone: phone.trim(), address: address.trim(), note: note.trim() || '-',
         total: finalTotal, returnDate, slip: slipImage,
+        couponCode: couponCode.trim().toUpperCase() || null,
+        discount: discount || 0,
         items: cartItems.map(i => ({ id: String(i.id), title: i.title, price: i.price * (i.rentweeks || 1), days: (i.rentweeks || 1) * 7, image: i.image || '' })),
       });
       localStorage.removeItem('cart');

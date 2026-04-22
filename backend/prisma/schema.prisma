@@ -53,6 +53,8 @@ model Order {
   slip         String?
   returnDate   String?
   date         String
+  couponCode   String?
+  discount     Float?      @default(0) 
   createdAt    DateTime    @default(now())
   user         User?       @relation(fields: [userId], references: [id])
   items        OrderItem[]

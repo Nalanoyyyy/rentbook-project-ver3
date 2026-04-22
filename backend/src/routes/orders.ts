@@ -18,11 +18,19 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 // POST /api/orders
 router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { customerName, phone, address, note, total, returnDate, slip, items } = req.body;
+    const { customerName, phone, address, note, total, returnDate, slip, items, couponCode, discount } = req.body;
     if (!customerName || !phone || !address || !total || !items?.length) return res.status(400).json({ error: 'ข้อมูลไม่ครบ' });
 
     const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
     if (user?.isBlacklisted) return res.status(403).json({ error: 'ไม่สามารถทำรายการได้ กรุณาติดต่อเจ้าหน้าที่' });
+
+    // เช็คว่าใช้คูปองนี้ไปแล้วไหม
+    if (couponCode) {
+      const alreadyUsed = await prisma.order.findFirst({
+        where: { userId: req.user!.id, couponCode }
+      });
+      if (alreadyUsed) return res.status(400).json({ error: 'คุณเคยใช้คูปองนี้แล้ว' });
+    }
 
     const orderId = `ORD-${Date.now()}`;
     const order = await prisma.order.create({
@@ -31,6 +39,8 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
         email: req.user!.email, address, note: note || '-',
         total: Number(total), slip: slip || null, returnDate: returnDate || null,
         date: new Date().toLocaleDateString('th-TH'),
+        couponCode: couponCode || null,
+        discount: Number(discount) || 0,
         items: {
           create: items.map((item: any) => ({
             bookId: Number(item.id), title: item.title,
@@ -44,15 +54,23 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
     for (const item of items) {
       await prisma.book.update({
         where: { id: Number(item.id) },
-        data: {
-          stock: { decrement: 1 },
-          isAvailable: { set: true },
-        }
+        data: { stock: { decrement: 1 }, isAvailable: { set: true } }
       });
       const book = await prisma.book.findUnique({ where: { id: Number(item.id) } });
       if (book && book.stock <= 0) {
         await prisma.book.update({ where: { id: book.id }, data: { isAvailable: false, status: 'ไม่ว่าง' } });
       }
+    }
+
+    // อัปเดต usageCount และ totalDiscount ของคูปอง
+    if (couponCode && discount) {
+      await prisma.coupon.updateMany({
+        where: { code: couponCode },
+        data: {
+          usageCount: { increment: 1 },
+          totalDiscount: { increment: Number(discount) }
+        }
+      });
     }
 
     res.status(201).json({ message: 'สร้าง order สำเร็จ', orderId: order.id });
@@ -65,14 +83,12 @@ router.put('/:id/status', authenticate, async (req: AuthRequest, res: Response) 
     const { status } = req.body;
     const isAdmin = req.user!.role === 'admin';
 
-    // ผู้ใช้ทั่วไปทำได้แค่ "รอรับคืน" เท่านั้น
     if (!isAdmin && status !== 'รอรับคืน') {
       return res.status(403).json({ error: 'ไม่มีสิทธิ์อัปเดตสถานะนี้' });
     }
 
     await prisma.order.update({ where: { id: req.params.id }, data: { status } });
 
-    // คืน stock ถ้า admin รับคืนหนังสือ
     if (status === 'คืนหนังสือแล้ว') {
       const items = await prisma.orderItem.findMany({ where: { orderId: req.params.id } });
       for (const item of items) {

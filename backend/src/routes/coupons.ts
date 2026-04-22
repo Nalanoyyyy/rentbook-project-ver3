@@ -1,7 +1,6 @@
-// backend/src/routes/coupons.ts
 import { Router, Request, Response } from 'express';
 import prisma from '../db';
-import { authenticate, requireAdmin } from '../middleware/auth';
+import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -22,12 +21,19 @@ router.get('/all', authenticate, requireAdmin, async (req: Request, res: Respons
 });
 
 // POST /api/coupons/verify
-router.post('/verify', async (req: Request, res: Response) => {
+router.post('/verify', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { code, subtotal } = req.body;
     const coupon = await prisma.coupon.findFirst({ where: { code: code?.toUpperCase(), isActive: true } });
     if (!coupon) return res.status(404).json({ error: 'ไม่พบโค้ดนี้ หรือโค้ดถูกปิดการใช้งาน' });
     if (subtotal < coupon.minSpend) return res.status(400).json({ error: `ใช้ได้เมื่อเช่าขั้นต่ำ ฿${coupon.minSpend}` });
+
+    // เช็คว่า user นี้เคยใช้คูปองนี้แล้วไหม
+    const alreadyUsed = await prisma.order.findFirst({
+      where: { userId: req.user!.id, couponCode: coupon.code }
+    });
+    if (alreadyUsed) return res.status(400).json({ error: 'คุณเคยใช้คูปองนี้แล้ว' });
+
     const discount = coupon.type === 'PERCENT'
       ? Math.floor(subtotal * coupon.discountValue / 100)
       : coupon.discountValue;
