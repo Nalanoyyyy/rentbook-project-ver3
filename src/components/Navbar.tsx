@@ -61,13 +61,16 @@ const Navbar: React.FC = () => {
   const onQueryChange = (v: string) => {
   setQuery(v);
   if (v.trim()) {
-    setSuggestions(allBooks.filter((b: any) => b.title?.toLowerCase().includes(v.toLowerCase())).slice(0, 5));
+    const filtered = allBooks
+      .filter((b: any) => b.title?.toLowerCase().includes(v.toLowerCase()))
+      .slice(0, 5);
+    setSuggestions(filtered);
     setShowSug(true);
   } else {
     setSuggestions([]);
     setShowSug(false);
   }
-  };
+};
 
   const nlCls = ({ isActive }: { isActive: boolean }) =>
     `text-sm font-medium transition-all duration-200 ${isActive ? 'text-primary dark:text-accent font-bold border-b-2 border-primary dark:border-accent pb-1' : 'hover:text-primary dark:hover:text-accent text-gray-600 dark:text-gray-300'}`;
