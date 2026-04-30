@@ -21,12 +21,29 @@ const RentalHistoryPage: React.FC = () => {
   const [orders,  setOrders]  = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const handleReturn = async (orderId: string) => {
-    if (!window.confirm('ยืนยันการคืนหนังสือ?')) return;
+  // ✅ เพิ่ม state สำหรับ Custom Modal
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string>('');
+
+  // ✅ เปลี่ยนจาก window.confirm เป็นเปิด Modal แทน
+  const handleReturnClick = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    setShowConfirm(true);
+  };
+
+  // ✅ ฟังก์ชันที่ทำงานเมื่อกดยืนยันใน Modal
+  const handleConfirm = async () => {
+    setShowConfirm(false);
     try {
-      await apiUpdateOrderStatus(orderId, 'รอรับคืน');
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'รอรับคืน' } : o));
-    } catch { alert('เกิดข้อผิดพลาด กรุณาลองใหม่'); }
+      await apiUpdateOrderStatus(selectedOrderId, 'รอรับคืน');
+      setOrders(prev =>
+        prev.map(o =>
+          o.id === selectedOrderId ? { ...o, status: 'รอรับคืน' } : o
+        )
+      );
+    } catch {
+      alert('เกิดข้อผิดพลาด กรุณาลองใหม่');
+    }
   };
 
   useEffect(() => {
@@ -87,14 +104,15 @@ const RentalHistoryPage: React.FC = () => {
                 <div>
                   <p className="text-xs text-red-500 font-bold mb-1">กำหนดคืนหนังสือภายใน:</p>
                   <p className="font-bold text-sm">{o.returnDate || '-'}</p>
-                   {(o.status === 'ยืนยันแล้ว' || o.status === 'กำลังจัดส่ง') && (
-              <button onClick={() => handleReturn(String(o.id))}
-              className="mt-3 px-4 py-2 bg-green-500 text-white text-xs font-bold rounded-xl hover:bg-green-600 transition-colors flex items-center gap-2">
-              <span className="material-symbols-outlined text-sm">assignment_return</span>
-              ยืนยันการคืนหนังสือ
-              </button>
-              )}
-
+                  {/* ✅ เปลี่ยน onClick จาก handleReturn เป็น handleReturnClick */}
+                  {(o.status === 'ยืนยันแล้ว' || o.status === 'กำลังจัดส่ง') && (
+                    <button
+                      onClick={() => handleReturnClick(String(o.id))}
+                      className="mt-3 px-4 py-2 bg-green-500 text-white text-xs font-bold rounded-xl hover:bg-green-600 transition-colors flex items-center gap-2">
+                      <span className="material-symbols-outlined text-sm">assignment_return</span>
+                      ยืนยันการคืนหนังสือ
+                    </button>
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">ยอดชำระสุทธิ</p>
@@ -105,6 +123,44 @@ const RentalHistoryPage: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/* ✅ Custom Modal แทน window.confirm */}
+      {showConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-[#1a3324] rounded-2xl p-6 w-80 shadow-xl border border-[#e7f3ec] dark:border-[#1a3324]">
+
+            <div className="flex justify-center mb-4">
+              <div className="bg-green-100 dark:bg-green-900/30 rounded-full p-3">
+                <span className="material-symbols-outlined text-green-600 text-3xl">
+                  assignment_return
+                </span>
+              </div>
+            </div>
+
+            <h3 className="text-center font-black text-lg mb-2">
+              ยืนยันการคืนหนังสือ?
+            </h3>
+            <p className="text-center text-gray-500 dark:text-gray-400 text-sm mb-6">
+              กรุณายืนยันว่าคุณต้องการแจ้งคืนหนังสือรายการนี้
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="flex-1 py-2 rounded-xl border border-gray-300 dark:border-white/20 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 font-bold transition-colors">
+                ยกเลิก
+              </button>
+              <button
+                onClick={handleConfirm}
+                className="flex-1 py-2 rounded-xl bg-green-500 text-white font-bold hover:bg-green-600 transition-colors">
+                ยืนยัน
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </main>
   );
 };
